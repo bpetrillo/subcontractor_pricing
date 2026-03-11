@@ -15,39 +15,34 @@ const SCOPES = [
 ].join(" ");
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
-function getAccessToken() {
-  return new Promise((resolve, reject) => {
-    const redirectUri = window.location.origin;
-    const url =
-      `https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/authorize?` +
-      new URLSearchParams({
-        client_id: CLIENT_ID,
-        response_type: "token",
-        redirect_uri: redirectUri,
-        scope: SCOPES,
-        response_mode: "fragment",
-        nonce: Math.random().toString(36),
-      });
+function buildAuthUrl() {
+  const redirectUri = window.location.origin;
+  return (
+    `https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/authorize?` +
+    new URLSearchParams({
+      client_id: CLIENT_ID,
+      response_type: "token",
+      redirect_uri: redirectUri,
+      scope: SCOPES,
+      response_mode: "fragment",
+      nonce: Math.random().toString(36),
+    })
+  );
+}
 
-    const popup = window.open(url, "msalPopup", "width=500,height=650");
-    if (!popup) return reject(new Error("Popup blocked — please allow popups for this page."));
+function getTokenFromUrl() {
+  const hash = window.location.hash;
+  if (!hash || !hash.includes("access_token")) return null;
+  const params = new URLSearchParams(hash.slice(1));
+  const token = params.get("access_token");
+  // Clean the hash from the URL without reloading
+  window.history.replaceState(null, "", window.location.pathname);
+  return token;
+}
 
-    const timer = setInterval(() => {
-      try {
-        const hash = popup.location.hash;
-        if (hash && hash.includes("access_token")) {
-          clearInterval(timer);
-          popup.close();
-          const p = new URLSearchParams(hash.slice(1));
-          resolve(p.get("access_token"));
-        }
-        if (popup.closed) {
-          clearInterval(timer);
-          reject(new Error("Sign-in window closed before completing."));
-        }
-      } catch (_) {}
-    }, 300);
-  });
+function redirectToLogin() {
+  sessionStorage.setItem("postAuthRedirect", "true");
+  window.location.href = buildAuthUrl();
 }
 
 // ── GRAPH HELPERS ─────────────────────────────────────────────────────────────
@@ -236,13 +231,19 @@ export default function SubPricingTool() {
   const filteredSubs = tradeFilter === "All" ? subs : subs.filter((s) => s.trade === tradeFilter);
   const selectedCount = Object.values(selected).filter(Boolean).length;
 
-  // Auto sign-in + load subs on mount
+  // Auth via redirect flow + load subs on mount
   useEffect(() => {
     (async () => {
       setSubsLoading(true);
       setSubsError("");
       try {
-        const t = await getAccessToken();
+        // Check if we just came back from a Microsoft login redirect
+        let t = getTokenFromUrl();
+        if (!t) {
+          // No token yet — redirect to Microsoft login
+          redirectToLogin();
+          return; // page will reload after login
+        }
         setToken(t);
         const loaded = await loadSubsFromExcel(t);
         setSubs(loaded);
