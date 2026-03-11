@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 // ── CONFIG ────────────────────────────────────────────────────────────────────
 const CLIENT_ID  = "68dbf196-5b89-4932-bb18-cc9b36cd19b8";
 const TENANT_ID  = "ee3eca2c-e65d-4770-a009-1f49aa38b996";
-const SITE_NAME  = "SunbeltUtilitiesCorp";
+const SITE_NAME  = "SunbletUtilitiesCorp";
 const CHANNEL    = "General";
 const FOLDER     = "Project Trackers";
 const WORKBOOK   = "Job Tracker.xlsx";
@@ -63,11 +63,10 @@ async function graphGet(token, path) {
 }
 
 async function loadSubsFromExcel(token) {
-  const siteRes = await graphGet(token, `/sites?search=${SITE_NAME}`);
-  const site = siteRes.value?.[0];
-  if (!site) throw new Error(`SharePoint site "${SITE_NAME}" not found.`);
+  const siteRes = await graphGet(token, `/sites/sunbletutilitiescorp.sharepoint.com:/sites/${SITE_NAME}`);
+  if (!siteRes.id) throw new Error(`SharePoint site "${SITE_NAME}" not found. Check App Registration permissions.`);
 
-  const drivesRes = await graphGet(token, `/sites/${site.id}/drives`);
+  const drivesRes = await graphGet(token, `/sites/${siteRes.id}/drives`);
   const drive = drivesRes.value?.find((d) => d.name === "Documents") || drivesRes.value?.[0];
   if (!drive) throw new Error("Could not find the Documents drive.");
 
