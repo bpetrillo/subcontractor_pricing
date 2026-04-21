@@ -204,7 +204,6 @@ export default function SubPricingTool() {
 
   // Step 0
   const [project, setProject]     = useState("");
-  const [scope, setScope]         = useState("");
   const [fileLink, setFileLink]   = useState("");
   const [fileLabel, setFileLabel] = useState("");
   const [dueDate, setDueDate]     = useState("");
@@ -258,7 +257,7 @@ export default function SubPricingTool() {
       .map((sub) => ({
         sub,
         subject: `Pricing Request – ${project}`,
-        body: buildEmailBody(sub, project, scope, fileLink, fileLabel, dueDate),
+        body: buildEmailBody(sub, project, sub.trade, fileLink, fileLabel, dueDate),
         extraCc: "",
       }));
 
@@ -279,7 +278,7 @@ export default function SubPricingTool() {
   };
 
   const reset = () => {
-    setStep(0); setResults(null); setProject(""); setScope(""); setFileLink(""); setFileLabel("");
+    setStep(0); setResults(null); setProject(""); setFileLink(""); setFileLabel("");
     setDueDate(""); setCc1(""); setCc2(""); setEmails([]); setPreviewMode({});
     const sel = {}; subs.forEach((_, i) => (sel[i] = false)); setSelected(sel);
   };
@@ -347,9 +346,6 @@ export default function SubPricingTool() {
 
                   <Field label="Project Name">
                     <input style={inputStyle} value={project} onChange={(e) => setProject(e.target.value)} placeholder="e.g. Wilgrove Subdivision" />
-                  </Field>
-                  <Field label="Scope" hint="e.g. Asphalt, Retaining Walls, Concrete, Utilities">
-                    <input style={inputStyle} value={scope} onChange={(e) => setScope(e.target.value)} placeholder="e.g. Asphalt / Utilities / Concrete" />
                   </Field>
                   <Field label="Plans Link (URL)">
                     <input style={inputStyle} value={fileLink} onChange={(e) => setFileLink(e.target.value)} placeholder="https://..." />
