@@ -113,21 +113,21 @@ async function sendEmail(token, ccList, toEmail, subject, body) {
 }
 
 // ── EMAIL TEMPLATE ────────────────────────────────────────────────────────────
-function buildEmailBody(sub, project, fileLink, fileLabel, dueDate) {
+function buildEmailBody(sub, project, scope, fileLink, fileLabel, dueDate) {
   const firstName = (sub.name || "").split(" ")[0] || "there";
   const due = dueDate
     ? new Date(dueDate + "T12:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric" })
     : "[due date TBD]";
   const label = fileLabel || project;
 
-  return `Hey ${firstName},<br><br>
-I have another project for you that's in my queue — ${project}. I wanted to get it into your hands as soon as possible.<br><br>
-When you have a chance, could you take a look at the plans and put together a quote for the usual?<br><br>
-You can access the plans here:<br>
+  return `Hi ${firstName},<br><br>
+I have a project I wanted to get over to you for pricing.<br><br>
+<strong>Project:</strong> ${project}<br>
+<strong>Scope:</strong> ${scope || "[scope TBD]"}<br>
 <a href="${fileLink}">${label}</a><br><br>
-If possible, could you have it back to me by ${due}?<br><br>
-Please let me know if you need anything else!<br><br>
-Thank you,`;
+Do you think you could have this back to me by ${due}?<br><br>
+Let me know if you have any questions.<br><br>
+Thanks,`;
 }
 
 // ── SHARED STYLES ─────────────────────────────────────────────────────────────
@@ -204,6 +204,7 @@ export default function SubPricingTool() {
 
   // Step 0
   const [project, setProject]     = useState("");
+  const [scope, setScope]         = useState("");
   const [fileLink, setFileLink]   = useState("");
   const [fileLabel, setFileLabel] = useState("");
   const [dueDate, setDueDate]     = useState("");
@@ -257,7 +258,7 @@ export default function SubPricingTool() {
       .map((sub) => ({
         sub,
         subject: `Pricing Request – ${project}`,
-        body: buildEmailBody(sub, project, fileLink, fileLabel, dueDate),
+        body: buildEmailBody(sub, project, scope, fileLink, fileLabel, dueDate),
       }));
 
   const handleSend = async () => {
@@ -276,7 +277,7 @@ export default function SubPricingTool() {
   };
 
   const reset = () => {
-    setStep(0); setResults(null); setProject(""); setFileLink(""); setFileLabel("");
+    setStep(0); setResults(null); setProject(""); setScope(""); setFileLink(""); setFileLabel("");
     setDueDate(""); setCc1(""); setCc2(""); setEmails([]); setPreviewMode({});
     const sel = {}; subs.forEach((_, i) => (sel[i] = false)); setSelected(sel);
   };
@@ -344,6 +345,9 @@ export default function SubPricingTool() {
 
                   <Field label="Project Name">
                     <input style={inputStyle} value={project} onChange={(e) => setProject(e.target.value)} placeholder="e.g. Wilgrove Subdivision" />
+                  </Field>
+                  <Field label="Scope" hint="e.g. Asphalt, Retaining Walls, Concrete, Utilities">
+                    <input style={inputStyle} value={scope} onChange={(e) => setScope(e.target.value)} placeholder="e.g. Asphalt / Utilities / Concrete" />
                   </Field>
                   <Field label="Plans Link (URL)">
                     <input style={inputStyle} value={fileLink} onChange={(e) => setFileLink(e.target.value)} placeholder="https://..." />
