@@ -259,6 +259,7 @@ export default function SubPricingTool() {
         sub,
         subject: `Pricing Request – ${project}`,
         body: buildEmailBody(sub, project, scope, fileLink, fileLabel, dueDate),
+        extraCc: "",
       }));
 
   const handleSend = async () => {
@@ -266,7 +267,8 @@ export default function SubPricingTool() {
     const res = [];
     for (const em of emails) {
       try {
-        await sendEmail(token, ccList, em.sub.email, em.subject, em.body);
+        const mergedCc = [...ccList, ...em.extraCc.split(',').map(e => e.trim()).filter(Boolean)];
+        await sendEmail(token, mergedCc, em.sub.email, em.subject, em.body);
         res.push({ name: em.sub.name || em.sub.email, ok: true });
       } catch (err) {
         res.push({ name: em.sub.name || em.sub.email, ok: false, error: err.message });
@@ -489,6 +491,17 @@ export default function SubPricingTool() {
                                 {isPreviewing ? "✏ Edit" : "👁 Preview"}
                               </button>
                             </div>
+                          </div>
+
+                          {/* Per-email CC */}
+                          <div style={{ padding: "8px 16px", borderBottom: "1px solid #f0ece4", background: "#fdfcf9", display: "flex", alignItems: "center", gap: 10 }}>
+                            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#aaa", textTransform: "uppercase", letterSpacing: ".06em", whiteSpace: "nowrap" }}>CC</span>
+                            <input
+                              value={em.extraCc}
+                              onChange={(e) => setEmails((prev) => prev.map((x, j) => j === i ? { ...x, extraCc: e.target.value } : x))}
+                              placeholder="Add email(s), comma-separated"
+                              style={{ flex: 1, padding: "5px 10px", borderRadius: 6, border: "1.5px solid #e8e4dc", fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#333", background: "#fff", outline: "none" }}
+                            />
                           </div>
 
                           {/* Preview mode — rendered HTML */}
