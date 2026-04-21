@@ -35,7 +35,6 @@ function getTokenFromUrl() {
   if (!hash || !hash.includes("access_token")) return null;
   const params = new URLSearchParams(hash.slice(1));
   const token = params.get("access_token");
-  // Clean the hash from the URL without reloading
   window.history.replaceState(null, "", window.location.pathname);
   return token;
 }
@@ -100,7 +99,7 @@ async function sendEmail(token, ccList, toEmail, subject, body) {
     body: JSON.stringify({
       message: {
         subject,
-        body: { contentType: "Text", content: body },
+        body: { contentType: "HTML", content: body },
         toRecipients: [{ emailAddress: { address: toEmail } }],
         ccRecipients: ccList.filter(Boolean).map((e) => ({ emailAddress: { address: e.trim() } })),
       },
@@ -120,21 +119,15 @@ function buildEmailBody(sub, project, fileLink, fileLabel, dueDate) {
     ? new Date(dueDate + "T12:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric" })
     : "[due date TBD]";
   const label = fileLabel || project;
-  return [
-    `Hey ${firstName},`,
-    "",
-    `I have another project for you that's in my queue — ${project}. I wanted to get it into your hands as soon as possible.`,
-    "",
-    `When you have a chance, could you take a look at the plans and put together a quote for the usual?`,
-    "",
-    `You can access the plans here:\n${label} – ${fileLink}`,
-    "",
-    `If possible, could you have it back to me by ${due}?`,
-    "",
-    `Please let me know if you need anything else!`,
-    "",
-    `Thank you,`,
-  ].join("\n");
+
+  return `Hey ${firstName},<br><br>
+I have another project for you that's in my queue — ${project}. I wanted to get it into your hands as soon as possible.<br><br>
+When you have a chance, could you take a look at the plans and put together a quote for the usual?<br><br>
+You can access the plans here:<br>
+<a href="${fileLink}">${label}</a><br><br>
+If possible, could you have it back to me by ${due}?<br><br>
+Please let me know if you need anything else!<br><br>
+Thank you,`;
 }
 
 // ── SHARED STYLES ─────────────────────────────────────────────────────────────
@@ -210,12 +203,12 @@ export default function SubPricingTool() {
   const [subsError, setSubsError]     = useState("");
 
   // Step 0
-  const [project, setProject]   = useState("");
-  const [fileLink, setFileLink] = useState("");
+  const [project, setProject]     = useState("");
+  const [fileLink, setFileLink]   = useState("");
   const [fileLabel, setFileLabel] = useState("");
-  const [dueDate, setDueDate]   = useState("");
-  const [cc1, setCc1]           = useState("");
-  const [cc2, setCc2]           = useState("");
+  const [dueDate, setDueDate]     = useState("");
+  const [cc1, setCc1]             = useState("");
+  const [cc2, setCc2]             = useState("");
 
   // Step 1
   const [tradeFilter, setTradeFilter] = useState("All");
@@ -226,23 +219,23 @@ export default function SubPricingTool() {
   const [sending, setSending] = useState(false);
   const [results, setResults] = useState(null);
 
+  // Which email card is showing preview vs raw HTML
+  const [previewMode, setPreviewMode] = useState({});
+
   const ccList = [cc1, cc2].filter(Boolean);
   const trades = ["All", ...Array.from(new Set(subs.map((s) => s.trade).filter(Boolean)))];
   const filteredSubs = tradeFilter === "All" ? subs : subs.filter((s) => s.trade === tradeFilter);
   const selectedCount = Object.values(selected).filter(Boolean).length;
 
-  // Auth via redirect flow + load subs on mount
   useEffect(() => {
     (async () => {
       setSubsLoading(true);
       setSubsError("");
       try {
-        // Check if we just came back from a Microsoft login redirect
         let t = getTokenFromUrl();
         if (!t) {
-          // No token yet — redirect to Microsoft login
           redirectToLogin();
-          return; // page will reload after login
+          return;
         }
         setToken(t);
         const loaded = await loadSubsFromExcel(t);
@@ -284,7 +277,7 @@ export default function SubPricingTool() {
 
   const reset = () => {
     setStep(0); setResults(null); setProject(""); setFileLink(""); setFileLabel("");
-    setDueDate(""); setCc1(""); setCc2(""); setEmails([]);
+    setDueDate(""); setCc1(""); setCc2(""); setEmails([]); setPreviewMode({});
     const sel = {}; subs.forEach((_, i) => (sel[i] = false)); setSelected(sel);
   };
 
@@ -305,6 +298,8 @@ export default function SubPricingTool() {
         .bp:hover:not([disabled]) { background: #2d2d4e !important; transform: translateY(-1px); }
         .bg:hover { background: #e8e4dc !important; }
         .bs:hover:not([disabled]) { background: #145214 !important; transform: translateY(-1px); }
+        .toggle-btn:hover { background: #e8e4dc !important; }
+        .email-preview a { color: #1a6b1a; }
       `}</style>
 
       <div style={{ width: "100%", maxWidth: 700 }}>
@@ -353,7 +348,7 @@ export default function SubPricingTool() {
                   <Field label="Plans Link (URL)">
                     <input style={inputStyle} value={fileLink} onChange={(e) => setFileLink(e.target.value)} placeholder="https://..." />
                   </Field>
-                  <Field label="Link Label" hint='How it appears in the email, e.g. "Wilgrove Subdivision – Civils & CAD"'>
+                  <Field label="Link Label" hint='Clickable text shown in the email, e.g. "Wilgrove Subdivision – Civils & CAD"'>
                     <input style={inputStyle} value={fileLabel} onChange={(e) => setFileLabel(e.target.value)} placeholder="Project name + file type" />
                   </Field>
                   <Field label="Quote Due Date">
@@ -464,23 +459,60 @@ export default function SubPricingTool() {
                   </p>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 14, maxHeight: 440, overflowY: "auto", paddingRight: 2, marginBottom: 20 }}>
-                    {emails.map((em, i) => (
-                      <div key={i} style={{ border: "1.5px solid #e8e4dc", borderRadius: 10, overflow: "hidden" }}>
-                        <div style={{ background: "#f8f5f0", padding: "9px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #e8e4dc" }}>
-                          <div>
-                            <span style={{ fontWeight: 600, fontSize: 13, color: "#1a1a2e" }}>{em.sub.name || em.sub.email}</span>
-                            <span style={{ fontSize: 12, color: "#bbb", marginLeft: 8 }}>{em.sub.email}</span>
-                            {em.sub.trade && <span style={{ fontSize: 11, fontFamily: "'DM Mono', monospace", marginLeft: 8, color: "#aaa" }}>{em.sub.trade}</span>}
+                    {emails.map((em, i) => {
+                      const isPreviewing = previewMode[i] !== false; // default to preview
+                      return (
+                        <div key={i} style={{ border: "1.5px solid #e8e4dc", borderRadius: 10, overflow: "hidden" }}>
+                          {/* Card header */}
+                          <div style={{ background: "#f8f5f0", padding: "9px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #e8e4dc" }}>
+                            <div>
+                              <span style={{ fontWeight: 600, fontSize: 13, color: "#1a1a2e" }}>{em.sub.name || em.sub.email}</span>
+                              <span style={{ fontSize: 12, color: "#bbb", marginLeft: 8 }}>{em.sub.email}</span>
+                              {em.sub.trade && <span style={{ fontSize: 11, fontFamily: "'DM Mono', monospace", marginLeft: 8, color: "#aaa" }}>{em.sub.trade}</span>}
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <span style={{ fontSize: 11, fontFamily: "'DM Mono', monospace", color: "#aaa" }}>Subj: {em.subject}</span>
+                              {/* Preview / Edit toggle */}
+                              <button
+                                className="toggle-btn"
+                                onClick={() => setPreviewMode((p) => ({ ...p, [i]: !isPreviewing }))}
+                                style={{
+                                  fontSize: 11, fontFamily: "'DM Mono', monospace", padding: "3px 10px",
+                                  borderRadius: 6, border: "1px solid #ddd", background: "#fff",
+                                  cursor: "pointer", color: "#555", transition: "background .15s",
+                                }}
+                              >
+                                {isPreviewing ? "✏ Edit" : "👁 Preview"}
+                              </button>
+                            </div>
                           </div>
-                          <span style={{ fontSize: 11, fontFamily: "'DM Mono', monospace", color: "#aaa", flexShrink: 0 }}>Subj: {em.subject}</span>
+
+                          {/* Preview mode — rendered HTML */}
+                          {isPreviewing ? (
+                            <div
+                              className="email-preview"
+                              style={{
+                                padding: "16px 18px", fontFamily: "'Lora', serif", fontSize: 13,
+                                color: "#333", lineHeight: 1.65, background: "#fff",
+                              }}
+                              dangerouslySetInnerHTML={{ __html: em.body }}
+                            />
+                          ) : (
+                            /* Edit mode — raw HTML textarea */
+                            <textarea
+                              value={em.body}
+                              onChange={(e) => setEmails((prev) => prev.map((x, j) => j === i ? { ...x, body: e.target.value } : x))}
+                              style={{
+                                width: "100%", border: "none", padding: "13px 16px",
+                                fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#333",
+                                resize: "vertical", minHeight: 200, background: "#fdfcf9",
+                                lineHeight: 1.6, display: "block",
+                              }}
+                            />
+                          )}
                         </div>
-                        <textarea
-                          value={em.body}
-                          onChange={(e) => setEmails((prev) => prev.map((x, j) => j === i ? { ...x, body: e.target.value } : x))}
-                          style={{ width: "100%", border: "none", padding: "13px 16px", fontFamily: "'Lora', serif", fontSize: 13, color: "#333", resize: "vertical", minHeight: 190, background: "#fff", lineHeight: 1.65, display: "block" }}
-                        />
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   <div style={{ background: "#f0fdf0", border: "1px solid #c8f5c8", borderRadius: 8, padding: "11px 16px", marginBottom: 18, fontSize: 13, color: "#1a5c1a" }}>
